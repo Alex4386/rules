@@ -1,4 +1,4 @@
-module github.com/nikunjy/rules
+module github.com/alex4386/rules
 
 go 1.21
 
