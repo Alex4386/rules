@@ -84,3 +84,6 @@ I would recommend importing `github.com/nikunjy/rules/parser`
 
 [ci-img]: https://api.travis-ci.org/nikunjy/rules.svg?branch=master
 [ci]: https://travis-ci.org/nikunjy/rules
+
+## Note for myself for extending rules
+[Note](NOTE.md)

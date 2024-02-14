@@ -38,6 +38,82 @@ func TestInvalidRule(t *testing.T) {
 	}
 }
 
+func TestRegexMatchedRule(t *testing.T) {
+	tests := []testCase{
+		{
+			`x MT "/^wel(.+)world$/ig"`,
+			obj{
+				"x": "welcome to the mungtaeng-i world",
+			},
+			true,
+			false,
+		},
+		{
+			`x mt "/^[a-z]{1,}/"`,
+			obj{
+				"x": "8abc8d96",
+			},
+			false,
+			false,
+		},
+		{
+			`x mt ["/noose/", "/[0-9]+/g"]`,
+			obj{
+				"x": "noose portal",
+			},
+			true,
+			false,
+		},
+	}
+
+	for _, tt := range tests {
+		result, err := eval(t, tt.rule, tt.input)
+		if tt.hasError {
+			assert.Error(t, err)
+			continue
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, result, tt.result, fmt.Sprintf("rule :%s, input :%v", tt.rule, tt.input))
+		}
+		assert.Equal(t, false, Evaluate(tt.rule, obj{"x": 4.5}), tt.rule)
+		assert.Equal(t, tt.result, Evaluate(fmt.Sprintf("(%s)", tt.rule), tt.input), tt.rule)
+	}
+}
+
+func TestIPMatchedRule(t *testing.T) {
+	tests := []testCase{
+		{
+			`x IN "1.0.0.0/8"`,
+			obj{
+				"x": "1.1.1.1",
+			},
+			true,
+			false,
+		},
+		{
+			`x in "1.0.0.1/32"`,
+			obj{
+				"x": "1.1.1.1",
+			},
+			false,
+			false,
+		},
+	}
+
+	for _, tt := range tests {
+		result, err := eval(t, tt.rule, tt.input)
+		if tt.hasError {
+			assert.Error(t, err)
+			continue
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, result, tt.result, fmt.Sprintf("rule :%s, input :%v", tt.rule, tt.input))
+		}
+		assert.Equal(t, false, Evaluate(tt.rule, obj{"x": 4.5}), tt.rule)
+		assert.Equal(t, tt.result, Evaluate(fmt.Sprintf("(%s)", tt.rule), tt.input), tt.rule)
+	}
+}
+
 func TestVersions(t *testing.T) {
 	tests := []testCase{
 		{

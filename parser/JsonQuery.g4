@@ -4,9 +4,7 @@ query
    : NOT? SP? '(' SP? query SP? ')'                                                                         #parenExp
    | query SP LOGICAL_OPERATOR SP query                                                             #logicalExp
    | attrPath SP 'pr'                                                                               #presentExp
-   | attrPath SP op=( EQ | NE | GT | LT | GE | LE | CO | SW | EW | IN ) SP value       #compareExp
-   | attrPath SP MT SP Regex                                                                 #regexExp
-   | attrPath SP op=( IN | MT ) SP ipCidr                                                  #ipExp
+   | attrPath SP op=( EQ | NE | GT | LT | GE | LE | CO | SW | EW | IN | MT ) SP value       #compareExp
    ;
 
 NOT
@@ -26,16 +24,16 @@ NULL
    ;
 
 IN:  'IN' | 'in';
-EQ : 'eq' | 'EQ' | 'equals' | '==';
-NE : 'ne' | 'NE' | 'noteq' | '!=';
+EQ : 'eq' | 'EQ' | 'equals' | 'EQUALS' | '==';
+NE : 'ne' | 'NE' | 'noteq' | 'NOTEQ' | '!=';
 GT : 'gt' | 'GT' | '>';
 LT : 'lt' | 'LT' | '<';
-GE : 'ge' | 'gte' | 'GE' | 'GTE' | '>=';
-LE : 'le' | 'lte' | 'LE' | 'LTE' | '<=';
-CO : 'co' | 'CO';
-SW : 'sw' | 'SW';
-EW : 'ew' | 'EW';
-MT : 'mt' | 'matches' | 'MT' | 'MATCHES' | '~=';
+GE : 'ge' | 'GE' | 'gte' | 'GTE' | '>=';
+LE : 'le' | 'LE' | 'lte' | 'LTE' | '<=';
+CO : 'co' | 'CO' | 'contains';
+SW : 'sw' | 'SW' | 'startsWith';
+EW : 'ew' | 'EW' | 'endsWith';
+MT : 'mt' | 'MT' | 'matches' | 'MATCHES' | '~=';
 
 attrPath
    : ATTRNAME subAttr?
@@ -70,13 +68,6 @@ value
    | listInts          #listOfInts
    | listDoubles       #listOfDoubles
    | listStrings       #listOfStrings
-   | IPV4              #ipv4
-   | IPV6              #ipv6
-   ;
-
-ipCidr
-   : IPV4Cidr
-   | IPV6Cidr
    ;
 
 VERSION
@@ -87,8 +78,6 @@ STRING
    : '"' (ESC | ~ ["\\])* '"'
    ;
 
-
-// list, sublist, and elements
 listStrings
    : '[' subListOfStrings
    ;
@@ -146,61 +135,4 @@ COMMA
    : ',' ' '*;
 SP
    : ' ' NEWLINE*
-   ;
-
-// IPv4 and IPv6 are defined in RFC 3986
-IPV4 : IPV4Octet '.' IPV4Octet '.' IPV4Octet '.' IPV4Octet ;
-IPV6 : IPV6HexSequence ('::' IPV6HexSequence?)? | '::' (IPV6HexSequence?) ;
-
-fragment IPV4Octet
-   : '25' [0-5]
-   | '2' [0-4] [0-9]
-   | '1' [0-9] [0-9]
-   | [1-9] [0-9]
-   | [0-9]
-   ;
-
-fragment IPV4Mask
-   : '3' [0-2]
-   | [1-2] [0-9]
-   | [0-9]
-   ;
-
-fragment IPV6HexSequence : IPV6HexPart (':' IPV6HexPart)* ;
-fragment IPV6HexPart : HEX+ ;
-
-fragment IPV6Mask
-   : '12' [0-8]
-   | '1' [0-1] [0-9]
-   | [1-9] [0-9]
-   | [0-9]
-   ;
-
-IPV4Cidr
-   : IPV4 ('/' IPV4Mask)
-   ;
-
-IPV6Cidr
-   : IPV6 ('/' IPV6Mask)
-   ;
-
-// Regular expression support
-Regex
-   : '/' RegexPattern '/' RegexFlags?
-   ;
-
-fragment RegexPattern
-   : (RegexChar | RegexEscape)+
-   ;
-
-fragment RegexFlags
-   : [gimsuy]+
-   ;
-
-fragment RegexChar
-   : ~[/\\]+
-   ;
-
-fragment RegexEscape
-   : '\\/'
    ;

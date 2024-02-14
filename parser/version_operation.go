@@ -74,3 +74,7 @@ func (v *VersionOperation) GE(left Operand, right Operand) (bool, error) {
 	}
 	return leftVer.GE(rightVer), nil
 }
+
+func (v *VersionOperation) MT(left Operand, right Operand) (bool, error) {
+	return v.EQ(left, right)
+}

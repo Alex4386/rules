@@ -72,6 +72,7 @@ func (j *JsonQueryVisitorImpl) Visit(tree antlr.ParseTree) interface{} {
 	if j.hasErr() {
 		return false
 	}
+
 	switch val := tree.(type) {
 	case *LogicalExpContext:
 		return val.Accept(j).(bool)
@@ -145,6 +146,8 @@ func (j *JsonQueryVisitorImpl) VisitCompareExp(ctx *CompareExpContext) interface
 		apply = currentOp.EW
 	case JsonQueryParserIN:
 		apply = currentOp.IN
+	case JsonQueryParserMT:
+		apply = currentOp.MT
 	default:
 		j.setErr(fmt.Errorf("Unknown operation %s", ctx.op.GetText()))
 		return false

@@ -80,3 +80,7 @@ func (o *FloatOperation) IN(left Operand, right Operand) (bool, error) {
 	}
 	return false, nil
 }
+
+func (o *FloatOperation) MT(left Operand, right Operand) (bool, error) {
+	return o.EQ(left, right)
+}
