@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -94,6 +95,38 @@ func TestIPMatchedRule(t *testing.T) {
 			`x in 1.0.0.1/32`,
 			obj{
 				"x": "1.1.1.1",
+			},
+			false,
+			false,
+		},
+		{
+			`x eq 1.1.1.1`,
+			obj{
+				"x": net.ParseIP("1.1.1.1"),
+			},
+			false,
+			false,
+		},
+		{
+			`x in 1.0.0.0/8`,
+			obj{
+				"x": net.ParseIP("1.1.1.1"),
+			},
+			false,
+			false,
+		},
+		{
+			`x in 1.0.0.1/32`,
+			obj{
+				"x": net.ParseIP("1.1.1.1"),
+			},
+			false,
+			false,
+		},
+		{
+			`x in 2001::8a2e:1/8`,
+			obj{
+				"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
 			},
 			false,
 			false,
