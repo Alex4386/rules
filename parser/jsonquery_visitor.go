@@ -11,11 +11,17 @@ type JsonQueryVisitor interface {
 	// Visit a parse tree produced by JsonQueryParser#compareExp.
 	VisitCompareExp(ctx *CompareExpContext) interface{}
 
+	// Visit a parse tree produced by JsonQueryParser#regexExp.
+	VisitRegexExp(ctx *RegexExpContext) interface{}
+
 	// Visit a parse tree produced by JsonQueryParser#parenExp.
 	VisitParenExp(ctx *ParenExpContext) interface{}
 
 	// Visit a parse tree produced by JsonQueryParser#presentExp.
 	VisitPresentExp(ctx *PresentExpContext) interface{}
+
+	// Visit a parse tree produced by JsonQueryParser#ipCompareExp.
+	VisitIpCompareExp(ctx *IpCompareExpContext) interface{}
 
 	// Visit a parse tree produced by JsonQueryParser#logicalExp.
 	VisitLogicalExp(ctx *LogicalExpContext) interface{}
@@ -52,6 +58,18 @@ type JsonQueryVisitor interface {
 
 	// Visit a parse tree produced by JsonQueryParser#listOfStrings.
 	VisitListOfStrings(ctx *ListOfStringsContext) interface{}
+
+	// Visit a parse tree produced by JsonQueryParser#regexValue.
+	VisitRegexValue(ctx *RegexValueContext) interface{}
+
+	// Visit a parse tree produced by JsonQueryParser#ipValue.
+	VisitIpValue(ctx *IpValueContext) interface{}
+
+	// Visit a parse tree produced by JsonQueryParser#listIPs.
+	VisitListIPs(ctx *ListIPsContext) interface{}
+
+	// Visit a parse tree produced by JsonQueryParser#subListOfIPs.
+	VisitSubListOfIPs(ctx *SubListOfIPsContext) interface{}
 
 	// Visit a parse tree produced by JsonQueryParser#listStrings.
 	VisitListStrings(ctx *ListStringsContext) interface{}

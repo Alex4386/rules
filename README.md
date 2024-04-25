@@ -14,7 +14,7 @@ This package will be very helpful in situations where you have a generic rule an
 
 Here are some examples:
 
-```
+```go
   parser.Evaluate("x eq 1", map[string]interface{}{"x": 1})
   parser.Evaluate("x == 1", map[string]interface{}{"x": 1})
   parser.Evaluate("x lt 1", map[string]interface{}{"x": 1})
@@ -36,7 +36,29 @@ Here are some examples:
   parser.Evaluate("y == 4 and (x IN [1,2,3])", map[string]interface{}{"x": 1})
 
   parser.Evaluate("y == 4 and (x eq 1.2.3)", map[string]interface{}{"x": "1.2.3"})
+```
 
+### Extra function of this fork
+This `rules` fork has an extra function which is more suitable for Firewall environment.  
+The following operations were added.
+
+* IP Address types
+   - Supports both IPv4 and IPv6
+* CIDR Notation support
+* Regular Expression support
+
+```go
+// regular expression support
+parser.Evaluate("x matches /^wel(.+)world$/g", map[string]interface{}{"x": "welcome to the mungtaeng-i world"}) // true
+parser.Evaluate("x matches /^wel(.+)world$/g", map[string]interface{}{"x": "good-bye from the mungtaeng-i world!"}) // false
+
+// IP Address types
+parser.Evaluate("x eq 1.1.1.1", map[string]interface{}{"x": net.ParseIP("1.1.1.1")}) // true
+parser.Evaluate("x == 2001:0db8:85a3:0000:0000:8a2e:0370:7334", map[string]interface{}{"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")}) // true
+parser.Evaluate("x ne 1.1.1.1", map[string]interface{}{"x": net.ParseIP("1.1.1.1")}) // false
+parser.Evaluate("x != 2001:0db8:85a3:0000:0000:8a2e:0370:7334", map[string]interface{}{"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")}) // false
+parser.Evaluate("x in 10.0.0.0/8", map[string]interface{}{"x": net.ParseIP("10.0.0.1")}) // true
+parser.Evaluate("x in 2001::8a2e:1/8", map[string]interface{}{"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")}) // true
 ```
 
 ## Operations
@@ -47,26 +69,27 @@ Logical Operations supported are `and` `or`
 
 Compare Expression and their definitions
 
-| expression | meaning   | 
--------------|------------
-| eq         | equals to |
-| ==         | equals to |
-| ne         | not equal to |
-| !=         | not equal to |
-| lt         | less than |
-| <          | less than |
-| gt         | greater than |
-| >          | greter than |
-| le         | less than or equal to |
-| <=          | less than or equal to  |
-| ge          | greater than or equal to|
-| >=          | greater than or equal to|
-| co         | contains  |
-| sw         | starts with  |
-| ew         | ends with  |
-| in         | in a list  |
-| pr         | present, will be true if you have a key as true  |
-| not         | not of a logical expression  |
+| expression | meaning                                         | 
+------------|-------------------------------------------------
+| eq         | equals to                                       |
+| ==         | equals to                                       |
+| ne         | not equal to                                    |
+| !=         | not equal to                                    |
+| lt         | less than                                       |
+| <          | less than                                       |
+| gt         | greater than                                    |
+| >          | greater than                                    |
+| le         | less than or equal to                           |
+| <=         | less than or equal to                           |
+| ge         | greater than or equal to                        |
+| >=         | greater than or equal to                        |
+| co         | contains                                        |
+| sw         | starts with                                     |
+| ew         | ends with                                       |
+| in         | in a list or CIDR range (IP)                    |
+| pr         | present, will be true if you have a key as true |
+| not        | not of a logical expression                     |
+| mt         | regular expression match (string)               |
 
 ## How to use it
 

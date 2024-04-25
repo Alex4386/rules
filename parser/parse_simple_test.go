@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,7 +42,7 @@ func TestInvalidRule(t *testing.T) {
 func TestRegexMatchedRule(t *testing.T) {
 	tests := []testCase{
 		{
-			`x MT "/^wel(.+)world$/ig"`,
+			`x MT /^wel(.+)world$/ig`,
 			obj{
 				"x": "welcome to the mungtaeng-i world",
 			},
@@ -49,7 +50,7 @@ func TestRegexMatchedRule(t *testing.T) {
 			false,
 		},
 		{
-			`x mt "/^[a-z]{1,}/"`,
+			`x mt /^[a-z]{1,}/`,
 			obj{
 				"x": "8abc8d96",
 			},
@@ -57,7 +58,7 @@ func TestRegexMatchedRule(t *testing.T) {
 			false,
 		},
 		{
-			`x mt ["/noose/", "/[0-9]+/g"]`,
+			`x mt /noose/`,
 			obj{
 				"x": "noose portal",
 			},
@@ -83,7 +84,7 @@ func TestRegexMatchedRule(t *testing.T) {
 func TestIPMatchedRule(t *testing.T) {
 	tests := []testCase{
 		{
-			`x IN "1.0.0.0/8"`,
+			`x IN 1.0.0.0/8`,
 			obj{
 				"x": "1.1.1.1",
 			},
@@ -91,9 +92,41 @@ func TestIPMatchedRule(t *testing.T) {
 			false,
 		},
 		{
-			`x in "1.0.0.1/32"`,
+			`x in 1.0.0.1/32`,
 			obj{
 				"x": "1.1.1.1",
+			},
+			false,
+			false,
+		},
+		{
+			`x eq 1.1.1.1`,
+			obj{
+				"x": net.ParseIP("1.1.1.1"),
+			},
+			false,
+			false,
+		},
+		{
+			`x in 1.0.0.0/8`,
+			obj{
+				"x": net.ParseIP("1.1.1.1"),
+			},
+			false,
+			false,
+		},
+		{
+			`x in 1.0.0.1/32`,
+			obj{
+				"x": net.ParseIP("1.1.1.1"),
+			},
+			false,
+			false,
+		},
+		{
+			`x in 2001::8a2e:1/8`,
+			obj{
+				"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
 			},
 			false,
 			false,
