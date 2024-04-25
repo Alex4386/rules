@@ -3,7 +3,10 @@ package parser
 import (
 	"errors"
 	"fmt"
+	regexp "github.com/wasilibs/go-re2"
+	"net"
 	"strconv"
+	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -82,6 +85,10 @@ func (j *JsonQueryVisitorImpl) Visit(tree antlr.ParseTree) interface{} {
 		return val.Accept(j).(bool)
 	case *PresentExpContext:
 		return val.Accept(j).(bool)
+	case *RegexExpContext:
+		return val.Accept(j).(bool)
+	case *IpCompareExpContext:
+		return val.Accept(j).(bool)
 	default:
 		j.setErr(errors.New("Invalid rule"))
 		return false
@@ -146,8 +153,6 @@ func (j *JsonQueryVisitorImpl) VisitCompareExp(ctx *CompareExpContext) interface
 		apply = currentOp.EW
 	case JsonQueryParserIN:
 		apply = currentOp.IN
-	case JsonQueryParserMT:
-		apply = currentOp.MT
 	default:
 		j.setErr(fmt.Errorf("Unknown operation %s", ctx.op.GetText()))
 		return false
@@ -369,4 +374,254 @@ func (j *JsonQueryVisitorImpl) VisitSubListOfStrings(ctx *SubListOfStringsContex
 		return nil
 	}
 	return ctx.SubListOfStrings().Accept(j)
+}
+
+/* NEEEEEEEEEEEEEEEEEEEEEW STUFFFFFFFFFFFFFFFFFFFF */
+
+func (j *JsonQueryVisitorImpl) VisitListIPs(ctx *ListIPsContext) interface{} {
+	return ctx.SubListOfIPs().Accept(j)
+}
+
+func (j *JsonQueryVisitorImpl) VisitSubListOfIPs(ctx *SubListOfIPsContext) interface{} {
+	if j.rightOp == nil {
+		j.rightOp = make([]any, 0)
+	}
+	rawVal := ctx.IpValue()
+	list := j.rightOp.([]any)
+	var val any = nil
+	if rawVal != nil {
+		if rawVal.IP_ADDRESS() != nil {
+			val = net.ParseIP(rawVal.IP_ADDRESS().GetText())
+		} else if rawVal.IP_CIDR() != nil {
+			val = net.ParseIP(rawVal.IP_CIDR().GetText())
+		}
+	}
+	j.rightOp = append(list, val)
+	if ctx.SubListOfIPs() == nil || ctx.SubListOfIPs().IsEmpty() {
+		return nil
+	}
+	return ctx.SubListOfIPs().Accept(j)
+}
+
+func (j *JsonQueryVisitorImpl) VisitIpValue(ctx *IpValueContext) interface{} {
+	j.currentOperation = &IPCompareOperation{}
+
+	isCIDR := false
+	txt := ""
+	var err error
+
+	if ctx.IP_ADDRESS() != nil {
+		txt = ctx.IP_ADDRESS().GetText()
+	} else if ctx.IP_CIDR() != nil {
+		txt = ctx.IP_CIDR().GetText()
+		isCIDR = true
+	} else {
+		j.setErr(errors.New("Invalid IP value"))
+		return nil
+	}
+
+	if j.rightOp == "" {
+		j.setErr(errors.New("Invalid IP value"))
+		return nil
+	}
+
+	if isCIDR {
+		var val *net.IPNet
+		_, val, err = net.ParseCIDR(txt)
+		if err != nil {
+			j.setErr(err)
+			return nil
+		}
+
+		j.rightOp = val
+	} else {
+		j.rightOp = net.ParseIP(txt)
+
+	}
+
+	return nil
+}
+func (j *JsonQueryVisitorImpl) VisitRegexValue(ctx *RegexValueContext) interface{} {
+	j.currentOperation = &RegexOperation{}
+	rawRegex := ctx.REGEX().GetText()
+
+	// check if regex starts with /
+	if !strings.HasPrefix(rawRegex, "/") {
+		j.setErr(errors.New("Invalid regex"))
+		return nil
+	}
+
+	// get last index of / from the regex
+	lastIndex := strings.LastIndex(rawRegex, "/")
+	if lastIndex == -1 {
+		j.setErr(errors.New("Invalid regex"))
+		return nil
+	}
+
+	// get the regex without the / at the start and end
+	regex := rawRegex[1:lastIndex]
+	flags := rawRegex[lastIndex+1:]
+
+	if flags != "" {
+		// check if the flags are valid
+		if !strings.ContainsAny(flags, "gim") {
+			j.setErr(errors.New("Invalid regex flags"))
+			return nil
+		}
+
+		for _, flag := range flags {
+			switch flag {
+			case 'i':
+				regex = fmt.Sprintf("(?i)%s", regex)
+				break
+			case 'm':
+				regex = fmt.Sprintf("(?m)%s", regex)
+				break
+			}
+		}
+	}
+
+	// build regex
+	compiledRegex, err := regexp.Compile(regex)
+	if err != nil {
+		j.setErr(err)
+		return nil
+	}
+
+	j.rightOp = compiledRegex
+	return nil
+}
+
+func (j *JsonQueryVisitorImpl) VisitRegexExp(ctx *RegexExpContext) interface{} {
+	ctx.AttrPath().Accept(j)
+	ctx.RegexValue().Accept(j)
+	if j.hasErr() {
+		return false
+	}
+	var apply func(Operand, Operand) (bool, error)
+	currentOp := j.currentOperation
+	switch ctx.op.GetTokenType() {
+	case JsonQueryParserMT:
+		apply = currentOp.MT
+	default:
+		j.setErr(fmt.Errorf("Unknown operation %s", ctx.op.GetText()))
+		return false
+	}
+	defer func() { j.rightOp = nil }()
+	ret, err := apply(j.leftOp, j.rightOp)
+	if err != nil {
+		switch err {
+		case ErrInvalidOperation:
+			// in case of invalid operation lets rather
+			// be conservative and return false because the rule doesn't even make
+			// sense. It can be argued that it would be false positive if we were
+			// to return true
+			j.setErr(err)
+			j.setDebugErr(
+				newNestedError(err, "Not a valid operation for datatypes").Set(ErrVals{
+					"operation":           ctx.op.GetTokenType(),
+					"object_path_operand": j.leftOp,
+					"rule_operand":        j.rightOp,
+				}),
+			)
+		case ErrEvalOperandMissing:
+			j.setDebugErr(
+				newNestedError(err, "Eval operand missing in input object").Set(ErrVals{
+					"attr_path": ctx.AttrPath().GetText(),
+				}),
+			)
+		default:
+			switch err.(type) {
+			case *ErrInvalidOperand:
+				j.setDebugErr(
+					newNestedError(err, "operands are not the right value type").Set(ErrVals{
+						"attr_path":           ctx.AttrPath().GetText(),
+						"object_path_operand": j.leftOp,
+						"rule_operand":        j.rightOp,
+					}),
+				)
+			default:
+				j.setDebugErr(
+					newNestedError(err, "unknown error").Set(ErrVals{
+						"attr_path":           ctx.AttrPath().GetText(),
+						"object_path_operand": j.leftOp,
+						"rule_operand":        j.rightOp,
+					}),
+				)
+
+			}
+		}
+
+		return false
+	}
+	return ret
+}
+
+func (j *JsonQueryVisitorImpl) VisitIpCompareExp(ctx *IpCompareExpContext) interface{} {
+	ctx.AttrPath().Accept(j)
+	ctx.IpValue().Accept(j)
+	if j.hasErr() {
+		return false
+	}
+	var apply func(Operand, Operand) (bool, error)
+	currentOp := j.currentOperation
+	switch ctx.op.GetTokenType() {
+	case JsonQueryParserEQ:
+		apply = currentOp.EQ
+	case JsonQueryParserNE:
+		apply = currentOp.NE
+	case JsonQueryParserIN:
+		apply = currentOp.IN
+	default:
+		j.setErr(fmt.Errorf("Unknown operation %s", ctx.op.GetText()))
+		return false
+	}
+	defer func() { j.rightOp = nil }()
+	ret, err := apply(j.leftOp, j.rightOp)
+	if err != nil {
+		switch err {
+		case ErrInvalidOperation:
+			// in case of invalid operation lets rather
+			// be conservative and return false because the rule doesn't even make
+			// sense. It can be argued that it would be false positive if we were
+			// to return true
+			j.setErr(err)
+			j.setDebugErr(
+				newNestedError(err, "Not a valid operation for datatypes").Set(ErrVals{
+					"operation":           ctx.op.GetTokenType(),
+					"object_path_operand": j.leftOp,
+					"rule_operand":        j.rightOp,
+				}),
+			)
+		case ErrEvalOperandMissing:
+			j.setDebugErr(
+				newNestedError(err, "Eval operand missing in input object").Set(ErrVals{
+					"attr_path": ctx.AttrPath().GetText(),
+				}),
+			)
+		default:
+			switch err.(type) {
+			case *ErrInvalidOperand:
+				j.setDebugErr(
+					newNestedError(err, "operands are not the right value type").Set(ErrVals{
+						"attr_path":           ctx.AttrPath().GetText(),
+						"object_path_operand": j.leftOp,
+						"rule_operand":        j.rightOp,
+					}),
+				)
+			default:
+				j.setDebugErr(
+					newNestedError(err, "unknown error").Set(ErrVals{
+						"attr_path":           ctx.AttrPath().GetText(),
+						"object_path_operand": j.leftOp,
+						"rule_operand":        j.rightOp,
+					}),
+				)
+
+			}
+		}
+
+		return false
+	}
+	return ret
 }
