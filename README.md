@@ -48,17 +48,17 @@ The following operations were added.
 * Regular Expression support
 
 ```go
-    // regular expression support
-    parser.Evaluate("x matches /^wel(.+)world$/g", map[string]interface{}{"x": "welcome to the mungtaeng-i world"}) // true
-    parser.Evaluate("x matches /^wel(.+)world$/g", map[string]interface{}{"x": "good-bye from the mungtaeng-i world!"}) // false
-	
-	// IP Address types
-    parser.Evaluate("x eq 1.1.1.1", map[string]interface{}{"x": net.ParseIP("1.1.1.1")}) // true
-	parser.Evaluate("x == 2001:0db8:85a3:0000:0000:8a2e:0370:7334", map[string]interface{}{"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")}) // true
-	parser.Evaluate("x ne 1.1.1.1", map[string]interface{}{"x": net.ParseIP("1.1.1.1")}) // false
-	parser.Evaluate("x != 2001:0db8:85a3:0000:0000:8a2e:0370:7334", map[string]interface{}{"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")}) // false
-	parser.Evaluate("x in 10.0.0.0/8", map[string]interface{}{"x": net.ParseIP("10.0.0.1")}) // true
-	parser.Evaluate("x in 2001::8a2e:1/8", map[string]interface{}{"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")}) // true
+// regular expression support
+parser.Evaluate("x matches /^wel(.+)world$/g", map[string]interface{}{"x": "welcome to the mungtaeng-i world"}) // true
+parser.Evaluate("x matches /^wel(.+)world$/g", map[string]interface{}{"x": "good-bye from the mungtaeng-i world!"}) // false
+
+// IP Address types
+parser.Evaluate("x eq 1.1.1.1", map[string]interface{}{"x": net.ParseIP("1.1.1.1")}) // true
+parser.Evaluate("x == 2001:0db8:85a3:0000:0000:8a2e:0370:7334", map[string]interface{}{"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")}) // true
+parser.Evaluate("x ne 1.1.1.1", map[string]interface{}{"x": net.ParseIP("1.1.1.1")}) // false
+parser.Evaluate("x != 2001:0db8:85a3:0000:0000:8a2e:0370:7334", map[string]interface{}{"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")}) // false
+parser.Evaluate("x in 10.0.0.0/8", map[string]interface{}{"x": net.ParseIP("10.0.0.1")}) // true
+parser.Evaluate("x in 2001::8a2e:1/8", map[string]interface{}{"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")}) // true
 ```
 
 ## Operations
