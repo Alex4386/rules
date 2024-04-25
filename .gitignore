@@ -1,2 +1,3 @@
 vendor
 .vscode
+/parser/antlr.jar
