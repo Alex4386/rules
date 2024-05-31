@@ -5,6 +5,7 @@ import (
 	"fmt"
 	regexp "github.com/wasilibs/go-re2"
 	"net"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -50,6 +51,8 @@ type JsonQueryVisitorImpl struct {
 
 	err      error
 	debugErr error
+
+	doPanic bool
 }
 
 func NewJsonQueryVisitorImpl(item map[string]interface{}) *JsonQueryVisitorImpl {
@@ -60,10 +63,16 @@ func NewJsonQueryVisitorImpl(item map[string]interface{}) *JsonQueryVisitorImpl 
 }
 
 func (j *JsonQueryVisitorImpl) setDebugErr(err error) {
+	if j.doPanic {
+		panic(err)
+	}
 	j.debugErr = err
 }
 
 func (j *JsonQueryVisitorImpl) setErr(err error) {
+	if j.doPanic {
+		panic(err)
+	}
 	j.err = err
 }
 
@@ -132,6 +141,7 @@ func (j *JsonQueryVisitorImpl) VisitCompareExp(ctx *CompareExpContext) interface
 	}
 	var apply func(Operand, Operand) (bool, error)
 	currentOp := j.currentOperation
+
 	switch ctx.op.GetTokenType() {
 	case JsonQueryParserEQ:
 		apply = currentOp.EQ
@@ -207,8 +217,36 @@ func (j *JsonQueryVisitorImpl) VisitCompareExp(ctx *CompareExpContext) interface
 	return ret
 }
 
+func GetSubAttr(source interface{}, index string) interface{} {
+	if source == nil {
+		return nil
+	}
+
+	if m, ok := source.(map[string]interface{}); ok {
+		return m[index]
+	}
+
+	if reflect.TypeOf(source).Kind() == reflect.Struct {
+		field := reflect.ValueOf(source).FieldByName(index)
+		if !field.IsValid() {
+			return nil
+		}
+		return field.Interface()
+	} else if reflect.TypeOf(source).Kind() == reflect.Map {
+		field := reflect.ValueOf(source).MapIndex(reflect.ValueOf(index))
+		if !field.IsValid() {
+			return nil
+		}
+		return field.Interface()
+	}
+
+	return nil
+}
+
 func (j *JsonQueryVisitorImpl) VisitAttrPath(ctx *AttrPathContext) interface{} {
 	var item interface{}
+	index := ctx.ATTRNAME().GetText()
+
 	if ctx.SubAttr() == nil || ctx.SubAttr().IsEmpty() {
 		if !j.stack.empty() {
 			item = j.stack.pop()
@@ -218,9 +256,101 @@ func (j *JsonQueryVisitorImpl) VisitAttrPath(ctx *AttrPathContext) interface{} {
 		if item == nil {
 			return nil
 		}
-		m := item.(map[string]interface{})
-		j.leftOp = m[ctx.ATTRNAME().GetText()]
+		j.leftOp = GetSubAttr(item, index)
+
+		if j.currentOperation == nil {
+			j.currentOperation = GetCurrentOperationByRight(j.leftOp)
+		}
+		fmt.Println("j.currentOperation", reflect.TypeOf(j.currentOperation).String())
+
+		fmt.Println("j.leftOp (after)", j.leftOp)
+		fmt.Println("j.item[index]", j.item[index])
+		fmt.Println("item.(type)", reflect.TypeOf(item))
+
 		j.stack.clear()
+		return nil
+	}
+
+	if !j.stack.empty() {
+		item = j.stack.peek()
+	} else {
+		item = j.item
+	}
+	if item == nil {
+		return nil
+	}
+	j.stack.push(GetSubAttr(item, index))
+	return ctx.SubAttr().Accept(j)
+}
+
+func (j *JsonQueryVisitorImpl) VisitSubAttr(ctx *SubAttrContext) interface{} {
+	return ctx.AttrPath().Accept(j)
+}
+
+func GetCurrentOperationByRight(right interface{}) Operation {
+	if right == nil {
+		return &NullOperation{}
+	} else if _, ok := right.(net.IP); ok {
+		return &IPCompareOperation{}
+	} else if _, ok := right.(net.IPNet); ok {
+		return &IPCompareOperation{}
+	} else if _, ok := right.(*regexp.Regexp); ok {
+		return &RegexOperation{}
+	}
+
+	reflectType := reflect.TypeOf(right)
+	fmt.Println("reflectType", reflectType.String())
+
+	if reflectType.Kind() == reflect.Slice || reflectType.Kind() == reflect.Array {
+		if reflectType.Elem().Kind() == reflect.String {
+			return &StringOperation{}
+		}
+		if reflectType.Elem().Kind() == reflect.Float64 || reflectType.Elem().Kind() == reflect.Float32 {
+			return &FloatOperation{}
+		}
+		if reflectType.Elem().Kind() == reflect.Int || reflectType.Elem().Kind() == reflect.Int64 {
+			return &IntOperation{}
+		}
+		if reflectType.Elem().Kind() == reflect.Bool {
+			return &BoolOperation{}
+		}
+	} else {
+		if reflectType.Kind() == reflect.String {
+			return &StringOperation{}
+		} else if reflectType.Kind() == reflect.Float64 || reflectType.Kind() == reflect.Float32 {
+			return &FloatOperation{}
+		} else if reflectType.Kind() == reflect.Int || reflectType.Kind() == reflect.Int64 {
+			return &IntOperation{}
+		} else if reflectType.Kind() == reflect.Bool {
+			return &BoolOperation{}
+		}
+	}
+
+	fmt.Println("reflectType", reflectType.String())
+
+	return nil
+}
+
+func (j *JsonQueryVisitorImpl) VisitValueAttrPath(ctx *ValueAttrPathContext) interface{} {
+	var item interface{}
+	index := ctx.ATTRNAME().GetText()
+	if ctx.ValueSubAttr() == nil || ctx.ValueSubAttr().IsEmpty() {
+		if !j.stack.empty() {
+			item = j.stack.pop()
+		} else {
+			item = j.item
+		}
+		if item == nil {
+			return nil
+		}
+
+		j.rightOp = GetSubAttr(item, index)
+		j.stack.clear()
+
+		if j.currentOperation == nil {
+			j.currentOperation = GetCurrentOperationByRight(j.rightOp)
+		}
+
 		return nil
 	}
 	if !j.stack.empty() {
@@ -231,13 +361,13 @@ func (j *JsonQueryVisitorImpl) VisitAttrPath(ctx *AttrPathContext) interface{} {
 	if item == nil {
 		return nil
 	}
-	m := item.(map[string]interface{})
-	j.stack.push(m[ctx.ATTRNAME().GetText()])
-	return ctx.SubAttr().Accept(j)
+
+	j.stack.push(GetSubAttr(item, index))
+	return ctx.ValueSubAttr().Accept(j)
 }
 
-func (j *JsonQueryVisitorImpl) VisitSubAttr(ctx *SubAttrContext) interface{} {
-	return ctx.AttrPath().Accept(j)
+func (j *JsonQueryVisitorImpl) VisitValueSubAttr(ctx *ValueSubAttrContext) interface{} {
+	return ctx.ValueAttrPath().Accept(j)
 }
 
 func (j *JsonQueryVisitorImpl) VisitBoolean(ctx *BooleanContext) interface{} {
@@ -624,4 +754,8 @@ func (j *JsonQueryVisitorImpl) VisitIpCompareExp(ctx *IpCompareExpContext) inter
 		return false
 	}
 	return ret
+}
+
+func (j *JsonQueryVisitorImpl) VisitVariable(ctx *VariableContext) interface{} {
+	return ctx.ValueAttrPath().Accept(j)
 }

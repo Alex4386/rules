@@ -1,12 +1,12 @@
 grammar JsonQuery;
 
 query
-   : NOT? SP? '(' SP? query SP? ')'                                                    #parenExp
-   | query SP LOGICAL_OPERATOR SP query                                                #logicalExp
-   | attrPath SP 'pr'                                                                  #presentExp
-   | attrPath SP op=( EQ | NE | GT | LT | GE | LE | CO | SW | EW | IN ) SP value       #compareExp
-   | attrPath SP op=MT SP regexValue                                                   #regexExp
-   | attrPath SP op=( EQ | NE | IN ) SP ipValue                                        #ipCompareExp
+   : NOT? SP? '(' SP? query SP? ')'                                                       #parenExp
+   | query SP LOGICAL_OPERATOR SP query                                                   #logicalExp
+   | attrPath SP 'pr'                                                                     #presentExp
+   | attrPath SP op=( EQ | NE | GT | LT | GE | LE | CO | SW | EW | IN ) SP value          #compareExp
+   | attrPath SP op=MT SP regexValue                                                      #regexExp
+   | attrPath SP op=( EQ | NE | IN ) SP ipValue                                           #ipCompareExp
    ;
 
 NOT
@@ -41,8 +41,16 @@ attrPath
    : ATTRNAME subAttr?
    ;
 
+valueAttrPath
+   : ATTRNAME valueSubAttr?
+   ;
+
 subAttr
    : '.' attrPath
+   ;
+
+valueSubAttr
+   : '.' valueAttrPath
    ;
 
 ATTRNAME
@@ -70,6 +78,7 @@ value
    | listInts          #listOfInts
    | listDoubles       #listOfDoubles
    | listStrings       #listOfStrings
+   | valueAttrPath     #variable
    ;
 
 VERSION
@@ -82,6 +91,7 @@ STRING
 
 regexValue
     : REGEX
+    | valueAttrPath
     ;
 
 REGEX

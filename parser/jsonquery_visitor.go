@@ -29,8 +29,14 @@ type JsonQueryVisitor interface {
 	// Visit a parse tree produced by JsonQueryParser#attrPath.
 	VisitAttrPath(ctx *AttrPathContext) interface{}
 
+	// Visit a parse tree produced by JsonQueryParser#valueAttrPath.
+	VisitValueAttrPath(ctx *ValueAttrPathContext) interface{}
+
 	// Visit a parse tree produced by JsonQueryParser#subAttr.
 	VisitSubAttr(ctx *SubAttrContext) interface{}
+
+	// Visit a parse tree produced by JsonQueryParser#valueSubAttr.
+	VisitValueSubAttr(ctx *ValueSubAttrContext) interface{}
 
 	// Visit a parse tree produced by JsonQueryParser#boolean.
 	VisitBoolean(ctx *BooleanContext) interface{}
@@ -58,6 +64,9 @@ type JsonQueryVisitor interface {
 
 	// Visit a parse tree produced by JsonQueryParser#listOfStrings.
 	VisitListOfStrings(ctx *ListOfStringsContext) interface{}
+
+	// Visit a parse tree produced by JsonQueryParser#variable.
+	VisitVariable(ctx *VariableContext) interface{}
 
 	// Visit a parse tree produced by JsonQueryParser#regexValue.
 	VisitRegexValue(ctx *RegexValueContext) interface{}

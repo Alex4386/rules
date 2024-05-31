@@ -9,8 +9,9 @@ import (
 type Evaluator struct {
 	lastDebugErr error
 
-	rule string
-	tree antlr.ParseTree
+	rule    string
+	tree    antlr.ParseTree
+	doPanic bool
 
 	testHookPanic func()
 }
@@ -39,6 +40,16 @@ func NewEvaluator(rule string) (ret *Evaluator, retErr error) {
 	}, nil
 }
 
+func NewEvaluatorWithPanicOnParseError(rule string) (ret *Evaluator, retErr error) {
+	ret, retErr = NewEvaluator(rule)
+	if retErr != nil {
+		return nil, retErr
+	}
+
+	ret.doPanic = true
+	return ret, nil
+}
+
 func (e *Evaluator) Reset() error {
 	e.lastDebugErr = nil
 	return nil
@@ -52,18 +63,24 @@ func (e *Evaluator) Process(items map[string]interface{}) (ret bool, retErr erro
 	e.lastDebugErr = nil
 	// antlr lib has panics for exceptions so we have to put a recover here
 	// in the unlikely case there is an exception
-	defer func() {
-		info := recover()
-		if info != nil {
-			retErr = fmt.Errorf("%q", info)
-			ret = false
-		}
-	}()
+	if !e.doPanic {
+		defer func() {
+			info := recover()
+			if info != nil {
+				retErr = fmt.Errorf("%q", info)
+				ret = false
+			}
+		}()
+	}
 
 	visitor := NewJsonQueryVisitorImpl(items)
+	if e.doPanic {
+		visitor.doPanic = true
+	}
+
 	result := visitor.Visit(e.tree)
 	e.lastDebugErr = visitor.debugErr
-	if e.testHookPanic != nil {
+	if e.testHookPanic != nil && !e.doPanic {
 		defer e.testHookPanic()
 	}
 	if result == nil || visitor.err != nil {

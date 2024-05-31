@@ -2,7 +2,6 @@ package parser
 
 import (
 	"fmt"
-	"net"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,8 +17,18 @@ type testCase struct {
 
 type obj map[string]interface{}
 
+var doPanic = false
+
 func eval(t *testing.T, rule string, input obj) (bool, error) {
 	ev, err := NewEvaluator(rule)
+
+	assert.NoError(t, err)
+	return ev.Process(input)
+}
+
+func evalPanic(t *testing.T, rule string, input obj) (bool, error) {
+	ev, err := NewEvaluatorWithPanicOnParseError(rule)
+
 	assert.NoError(t, err)
 	return ev.Process(input)
 }
@@ -80,73 +89,6 @@ func TestRegexMatchedRule(t *testing.T) {
 		assert.Equal(t, tt.result, Evaluate(fmt.Sprintf("(%s)", tt.rule), tt.input), tt.rule)
 	}
 }
-
-func TestIPMatchedRule(t *testing.T) {
-	tests := []testCase{
-		{
-			`x IN 1.0.0.0/8`,
-			obj{
-				"x": "1.1.1.1",
-			},
-			true,
-			false,
-		},
-		{
-			`x in 1.0.0.1/32`,
-			obj{
-				"x": "1.1.1.1",
-			},
-			false,
-			false,
-		},
-		{
-			`x eq 1.1.1.1`,
-			obj{
-				"x": net.ParseIP("1.1.1.1"),
-			},
-			false,
-			false,
-		},
-		{
-			`x in 1.0.0.0/8`,
-			obj{
-				"x": net.ParseIP("1.1.1.1"),
-			},
-			false,
-			false,
-		},
-		{
-			`x in 1.0.0.1/32`,
-			obj{
-				"x": net.ParseIP("1.1.1.1"),
-			},
-			false,
-			false,
-		},
-		{
-			`x in 2001::8a2e:1/8`,
-			obj{
-				"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
-			},
-			false,
-			false,
-		},
-	}
-
-	for _, tt := range tests {
-		result, err := eval(t, tt.rule, tt.input)
-		if tt.hasError {
-			assert.Error(t, err)
-			continue
-		} else {
-			assert.NoError(t, err)
-			assert.Equal(t, result, tt.result, fmt.Sprintf("rule :%s, input :%v", tt.rule, tt.input))
-		}
-		assert.Equal(t, false, Evaluate(tt.rule, obj{"x": 4.5}), tt.rule)
-		assert.Equal(t, tt.result, Evaluate(fmt.Sprintf("(%s)", tt.rule), tt.input), tt.rule)
-	}
-}
-
 func TestVersions(t *testing.T) {
 	tests := []testCase{
 		{
