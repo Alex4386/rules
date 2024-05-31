@@ -4,9 +4,9 @@ query
    : NOT? SP? '(' SP? query SP? ')'                                                       #parenExp
    | query SP LOGICAL_OPERATOR SP query                                                   #logicalExp
    | attrPath SP 'pr'                                                                     #presentExp
+   | attrPath SP op=( EQ | NE | IN ) SP ipValue                                           #ipCompareExp
    | attrPath SP op=( EQ | NE | GT | LT | GE | LE | CO | SW | EW | IN ) SP value          #compareExp
    | attrPath SP op=MT SP regexValue                                                      #regexExp
-   | attrPath SP op=( EQ | NE | IN ) SP ipValue                                           #ipCompareExp
    ;
 
 NOT
@@ -45,19 +45,23 @@ valueAttrPath
    : ATTRNAME valueSubAttr?
    ;
 
+JSON_SEP
+    : '.'
+    ;
+
 subAttr
-   : '.' attrPath
+   : JSON_SEP attrPath
    ;
 
 valueSubAttr
-   : '.' valueAttrPath
+   : JSON_SEP valueAttrPath
    ;
 
 ATTRNAME
    : ALPHA ATTR_NAME_CHAR* ;
 
 fragment ATTR_NAME_CHAR
-   : '-' | '_' | ':' | DIGIT | ALPHA
+   : ('-' | '_' | DIGIT | ALPHA)
    ;
 
 fragment DIGIT
@@ -145,7 +149,7 @@ fragment OCTET
 fragment IPv6
     :   (HEX_QUARTET ':') (HEX_QUARTET ':') (HEX_QUARTET ':') (HEX_QUARTET ':') (HEX_QUARTET ':')  HEX_QUARTET (':' HEX_QUARTET)?  // Basic IPv6 (six quartets + one or two more)
     |   '::' (HEX_QUARTET ':')* HEX_QUARTET                    // Leading ::
-    |   (HEX_QUARTET ':')* '::' (HEX_QUARTET ':')* HEX_QUARTET // Embedded ::
+    |   (HEX_QUARTET ':')* ':' (HEX_QUARTET ':')* HEX_QUARTET // Embedded ::
     ;
 
 fragment HEX_QUARTET
