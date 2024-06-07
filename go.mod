@@ -5,6 +5,7 @@ go 1.21
 require (
 	github.com/antlr4-go/antlr/v4 v4.13.0
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/nikunjy/rules v1.5.0
 	github.com/stretchr/testify v1.3.0
 	github.com/wasilibs/go-re2 v1.5.2
 )

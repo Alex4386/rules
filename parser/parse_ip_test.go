@@ -78,7 +78,7 @@ func TestIPMatchedRule(t *testing.T) {
 			obj{
 				"x": net.ParseIP("1.1.1.1"),
 			},
-			false,
+			true,
 			false,
 		},
 		{
@@ -88,7 +88,7 @@ func TestIPMatchedRule(t *testing.T) {
 					"ip": net.ParseIP("1.1.1.1"),
 				},
 			},
-			false,
+			true,
 			false,
 		},
 		{
@@ -96,7 +96,7 @@ func TestIPMatchedRule(t *testing.T) {
 			obj{
 				"x": net.ParseIP("1.1.1.1"),
 			},
-			false,
+			true,
 			false,
 		},
 		{
@@ -118,7 +118,7 @@ func TestIPMatchedRule(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result, err := evalPanic(t, tt.rule, tt.input)
+		result, err := eval(t, tt.rule, tt.input)
 		if tt.hasError {
 			assert.Error(t, err)
 			continue

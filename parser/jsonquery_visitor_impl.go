@@ -261,11 +261,11 @@ func (j *JsonQueryVisitorImpl) VisitAttrPath(ctx *AttrPathContext) interface{} {
 		if j.currentOperation == nil {
 			j.currentOperation = GetCurrentOperationByRight(j.leftOp)
 		}
-		fmt.Println("j.currentOperation", reflect.TypeOf(j.currentOperation).String())
+		//fmt.Println("j.currentOperation", reflect.TypeOf(j.currentOperation).String())
 
-		fmt.Println("j.leftOp (after)", j.leftOp)
-		fmt.Println("j.item[index]", j.item[index])
-		fmt.Println("item.(type)", reflect.TypeOf(item))
+		//fmt.Println("j.leftOp (after)", j.leftOp)
+		//fmt.Println("j.item[index]", j.item[index])
+		//fmt.Println("item.(type)", reflect.TypeOf(item))
 
 		j.stack.clear()
 		return nil
@@ -299,7 +299,7 @@ func GetCurrentOperationByRight(right interface{}) Operation {
 	}
 
 	reflectType := reflect.TypeOf(right)
-	fmt.Println("reflectType", reflectType.String())
+	//fmt.Println("reflectType", reflectType.String())
 
 	if reflectType.Kind() == reflect.Slice || reflectType.Kind() == reflect.Array {
 		if reflectType.Elem().Kind() == reflect.String {
