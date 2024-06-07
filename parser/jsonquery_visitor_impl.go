@@ -294,6 +294,10 @@ func GetCurrentOperationByRight(right interface{}) Operation {
 		return &IPCompareOperation{}
 	} else if _, ok := right.(net.IPNet); ok {
 		return &IPCompareOperation{}
+	} else if _, ok := right.([]net.IP); ok {
+		return &IPCompareOperation{}
+	} else if _, ok := right.([]net.IPNet); ok {
+		return &IPCompareOperation{}
 	} else if _, ok := right.(*regexp.Regexp); ok {
 		return &RegexOperation{}
 	}
@@ -314,6 +318,7 @@ func GetCurrentOperationByRight(right interface{}) Operation {
 		if reflectType.Elem().Kind() == reflect.Bool {
 			return &BoolOperation{}
 		}
+
 	} else {
 		if reflectType.Kind() == reflect.String {
 			return &StringOperation{}
@@ -325,8 +330,6 @@ func GetCurrentOperationByRight(right interface{}) Operation {
 			return &BoolOperation{}
 		}
 	}
-
-	fmt.Println("reflectType", reflectType.String())
 
 	return nil
 }
