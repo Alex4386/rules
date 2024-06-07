@@ -187,7 +187,10 @@ func (j *JsonQueryVisitorImpl) VisitCompareExp(ctx *CompareExpContext) interface
 		case ErrEvalOperandMissing:
 			j.setDebugErr(
 				newNestedError(err, "Eval operand missing in input object").Set(ErrVals{
-					"attr_path": ctx.AttrPath().GetText(),
+					"attr_path":           ctx.AttrPath().GetText(),
+					"value":               ctx.Value().GetText(),
+					"object_path_operand": j.leftOp,
+					"rule_operand":        j.rightOp,
 				}),
 			)
 		default:
@@ -292,11 +295,11 @@ func GetCurrentOperationByRight(right interface{}) Operation {
 		return &NullOperation{}
 	} else if _, ok := right.(net.IP); ok {
 		return &IPCompareOperation{}
-	} else if _, ok := right.(net.IPNet); ok {
+	} else if _, ok := right.(*net.IPNet); ok {
 		return &IPCompareOperation{}
 	} else if _, ok := right.([]net.IP); ok {
 		return &IPCompareOperation{}
-	} else if _, ok := right.([]net.IPNet); ok {
+	} else if _, ok := right.([]*net.IPNet); ok {
 		return &IPCompareOperation{}
 	} else if _, ok := right.(*regexp.Regexp); ok {
 		return &RegexOperation{}

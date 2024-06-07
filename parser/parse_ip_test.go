@@ -7,6 +7,18 @@ import (
 	"testing"
 )
 
+func CIDRBuilder(cidr ...string) []*net.IPNet {
+	var result []*net.IPNet
+	for _, c := range cidr {
+		_, ipNet, err := net.ParseCIDR(c)
+		if err != nil {
+			panic(err)
+		}
+		result = append(result, ipNet)
+	}
+	return result
+}
+
 func TestVariableMatchedRule(t *testing.T) {
 	tests := []testCase{
 		{
@@ -23,6 +35,27 @@ func TestVariableMatchedRule(t *testing.T) {
 			obj{
 				"x": net.ParseIP("1.1.1.1"),
 				"z": net.ParseIP("1.1.1.1"),
+			},
+			true,
+			false,
+		},
+		{
+			"x in arr",
+			obj{
+				"x": net.ParseIP("1.1.1.1"),
+				"arr": []net.IP{
+					net.ParseIP("1.1.1.1"),
+					net.ParseIP("1.1.1.2"),
+				},
+			},
+			true,
+			false,
+		},
+		{
+			"x in arr",
+			obj{
+				"x":   net.ParseIP("1.1.1.1"),
+				"arr": CIDRBuilder("1.1.1.0/24", "1.1.0.0/24"),
 			},
 			true,
 			false,

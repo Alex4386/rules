@@ -8,22 +8,6 @@ type IPCompareOperation struct {
 	NullOperation
 }
 
-func tryConversion(op Operand) any {
-	if op == nil {
-		return nil
-	}
-
-	if val, ok := op.(string); ok {
-		return val
-	} else if val, ok := op.(net.IP); ok {
-		return val
-	} else if val, ok := op.(*net.IPNet); ok {
-		return val
-	}
-
-	return nil
-}
-
 func (o *IPCompareOperation) get(left Operand, right Operand) (net.IP, any, error) {
 	if left == nil {
 		return nil, nil, ErrEvalOperandMissing
@@ -45,21 +29,24 @@ func (o *IPCompareOperation) get(left Operand, right Operand) (net.IP, any, erro
 		return leftVal, nil, nil
 	}
 
-	rightVal, ok := right.(net.IP)
-	if !ok {
-		if rightNet, ok := right.(*net.IPNet); ok {
-			return leftVal, rightNet, nil
+	var rightVal any
+	if v, ok := right.(string); ok {
+		_, ipNet, err := net.ParseCIDR(v)
+		if err != nil {
+			rightVal = net.ParseIP(v)
 		} else {
-			var rightStr string
-			if rightStr, ok = right.(string); !ok {
-				return nil, nil, ErrEvalOperandMissing
-			}
-
-			rightVal = net.ParseIP(rightStr)
-			if rightVal == nil {
-				return nil, nil, newErrInvalidOperand(right, rightVal)
-			}
+			rightVal = ipNet
 		}
+	} else if v, ok := right.(net.IP); ok {
+		rightVal = v
+	} else if v, ok := right.(*net.IPNet); ok {
+		rightVal = v
+	} else if v, ok := right.([]net.IP); ok {
+		rightVal = v
+	} else if v, ok := right.([]*net.IPNet); ok {
+		rightVal = v
+	} else {
+		return nil, nil, newErrInvalidOperand(right, rightVal)
 	}
 
 	return leftVal, rightVal, nil
@@ -95,18 +82,20 @@ func (o *IPCompareOperation) IN(left Operand, right Operand) (bool, error) {
 		return false, err
 	}
 
-	if rCIDR, ok := r.(*net.IPNet); ok {
-		return rCIDR.Contains(l), nil
-	} else if rArr, ok := r.([]any); ok {
-		for _, data := range rArr {
-			if rIP, ok := data.(net.IP); ok {
-				if l.Equal(rIP) {
-					return true, nil
-				}
-			} else if rNet, ok := data.(*net.IPNet); ok {
-				if rNet.Contains(l) {
-					return true, nil
-				}
+	if v, ok := r.(net.IP); ok {
+		return l.Equal(v), nil
+	} else if v, ok := r.(*net.IPNet); ok {
+		return v.Contains(l), nil
+	} else if v, ok := r.([]net.IP); ok {
+		for _, data := range v {
+			if l.Equal(data) {
+				return true, nil
+			}
+		}
+	} else if v, ok := r.([]*net.IPNet); ok {
+		for _, data := range v {
+			if data.Contains(l) {
+				return true, nil
 			}
 		}
 	}
