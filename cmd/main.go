@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 
-	"github.com/nikunjy/rules/parser"
+	"github.com/alex4386/rules/parser"
 )
 
 type obj map[string]interface{}

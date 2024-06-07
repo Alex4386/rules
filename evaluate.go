@@ -1,6 +1,6 @@
 package rules
 
-import "github.com/nikunjy/rules/parser"
+import "github.com/alex4386/rules/parser"
 
 func Evaluate(rule string, items map[string]interface{}) (bool, error) {
 	ev, err := parser.NewEvaluator(rule)

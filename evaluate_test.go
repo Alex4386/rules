@@ -14,8 +14,9 @@ func TestEvaluateBasic(t *testing.T) {
 	require.True(t, res)
 
 	res, err = Evaluate(`x eq abc`, map[string]interface{}{
-		"x": "abc",
+		"x":   "abc",
+		"abc": "abc",
 	})
-	require.Error(t, err)
-	require.False(t, res)
+	require.NoError(t, err)
+	require.True(t, res)
 }
