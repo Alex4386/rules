@@ -46,6 +46,7 @@ The following operations were added.
    - Supports both IPv4 and IPv6
 * CIDR Notation support
 * Regular Expression support
+* Right side operands
 
 ```go
 // regular expression support
