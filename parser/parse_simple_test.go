@@ -21,8 +21,9 @@ var doPanic = false
 
 func eval(t *testing.T, rule string, input obj) (bool, error) {
 	ev, err := NewEvaluator(rule)
-
-	assert.NoError(t, err)
+	if err != nil {
+		return false, err
+	}
 	return ev.Process(input)
 }
 

@@ -42,6 +42,9 @@ func BenchmarkLogicalExpression(b *testing.B) {
 func BenchmarkLogicalExpressionBig(b *testing.B) {
 	rule := ""
 	for j := 0; j < 100; j++ {
+		if j > 0 {
+			rule += " or "
+		}
 		for i, condition := range conditions {
 			if i == len(conditions)-1 {
 				rule += fmt.Sprintf(" (((%s)))", condition)
@@ -70,6 +73,9 @@ func BenchmarkLogicalExpressionBig(b *testing.B) {
 func BenchmarkLogicalExpressionBigTreeCached(b *testing.B) {
 	rule := ""
 	for j := 0; j < 100; j++ {
+		if j > 0 {
+			rule += " or "
+		}
 		for i, condition := range conditions {
 			if i == len(conditions)-1 {
 				rule += fmt.Sprintf(" (((%s)))", condition)

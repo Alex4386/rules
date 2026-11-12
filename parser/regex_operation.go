@@ -16,7 +16,7 @@ func (o *RegexOperation) getString(operand Operand) (string, error) {
 	case fmt.Stringer:
 		return opVal.String(), nil
 	default:
-		return "", newErrInvalidOperand(operand, opVal)
+		return "", newErrInvalidOperand(operand, "")
 	}
 }
 
@@ -29,21 +29,19 @@ func (o *RegexOperation) get(left Operand, right Operand) (string, *regexp.Regex
 		return "", nil, err
 	}
 
-	if right == nil {
-		return leftVal, nil, nil
-	}
-
 	rightVal, ok := right.(*regexp.Regexp)
 	if !ok {
-		if rightStr, ok := right.(string); !ok {
+		// pattern taken from the input object (`a mt b`)
+		rightStr, ok := right.(string)
+		if !ok {
 			return "", nil, ErrEvalOperandMissing
-		} else {
-			rightVal = regexp.MustCompile(rightStr)
+		}
+		if rightVal, err = regexp.Compile(rightStr); err != nil {
+			return "", nil, err
 		}
 	}
-
 	if rightVal == nil {
-		return leftVal, nil, newErrInvalidOperand(right, rightVal)
+		return "", nil, ErrEvalOperandMissing
 	}
 
 	return leftVal, rightVal, nil

@@ -17,7 +17,7 @@ func (o *StringOperation) getString(operand Operand) (string, error) {
 	case fmt.Stringer:
 		return opVal.String(), nil
 	default:
-		return "", newErrInvalidOperand(operand, opVal)
+		return "", newErrInvalidOperand(operand, "")
 	}
 }
 
@@ -33,7 +33,7 @@ func (o *StringOperation) get(left Operand, right Operand) (string, string, erro
 	if err != nil {
 		return "", "", err
 	}
-	return strings.ToLower(leftVal), strings.ToLower(rightVal), nil
+	return leftVal, rightVal, nil
 
 }
 
@@ -111,6 +111,9 @@ func (o *StringOperation) EW(left Operand, right Operand) (bool, error) {
 }
 
 func (o *StringOperation) IN(left Operand, right Operand) (bool, error) {
+	if left == nil {
+		return false, ErrEvalOperandMissing
+	}
 	leftVal, err := o.getString(left)
 	if err != nil {
 		return false, err

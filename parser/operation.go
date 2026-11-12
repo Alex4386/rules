@@ -3,8 +3,36 @@ package parser
 import (
 	"errors"
 	"fmt"
-	"reflect"
 )
+
+// numIn reports whether left is in a rule list of ints or doubles.
+// shortcut: compares as float64, so ints beyond 2^53 lose precision; compare as int64 if that matters.
+func numIn(left Operand, right Operand) (bool, error) {
+	if left == nil {
+		return false, ErrEvalOperandMissing
+	}
+	l, err := toFloat(left)
+	if err != nil {
+		return false, err
+	}
+	switch list := right.(type) {
+	case []int:
+		for _, n := range list {
+			if float64(n) == l {
+				return true, nil
+			}
+		}
+	case []float64:
+		for _, n := range list {
+			if n == l {
+				return true, nil
+			}
+		}
+	default:
+		return false, newErrInvalidOperand(right, []float64{})
+	}
+	return false, nil
+}
 
 func toFloat(op Operand) (float64, error) {
 	switch val := op.(type) {
@@ -12,6 +40,12 @@ func toFloat(op Operand) (float64, error) {
 		return float64(val), nil
 	case float64:
 		return val, nil
+	case float32:
+		return float64(val), nil
+	case int32:
+		return float64(val), nil
+	case int64:
+		return float64(val), nil
 	}
 	var exp float64
 	return 0, newErrInvalidOperand(op, exp)
@@ -52,11 +86,9 @@ func newErrInvalidOperand(val Operand, typeObj interface{}) *ErrInvalidOperand {
 }
 
 func (e *ErrInvalidOperand) Error() string {
-	return fmt.Sprintf("Operand %v is not the correct type. Expected: %s, Actual: %s",
-		e.Val,
-		reflect.TypeOf(e.typeObj).String(),
-		reflect.TypeOf(e.Val).String(),
-	)
+	// %T rather than reflect.TypeOf(x).String(): either side may be nil
+	return fmt.Sprintf("Operand %v is not the correct type. Expected: %T, Actual: %T",
+		e.Val, e.typeObj, e.Val)
 }
 
 type Operation interface {

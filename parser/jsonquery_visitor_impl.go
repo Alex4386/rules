@@ -12,38 +12,10 @@ import (
 	"github.com/antlr4-go/antlr/v4"
 )
 
-type objStack struct {
-	items []interface{}
-}
-
-func (o *objStack) empty() bool {
-	return len(o.items) == 0
-}
-
-func (o *objStack) peek() interface{} {
-	return o.items[len(o.items)-1]
-}
-
-func (o *objStack) pop() interface{} {
-	val := o.peek()
-	o.items = o.items[:len(o.items)-1]
-	return val
-}
-
-func (o *objStack) push(item interface{}) {
-	o.items = append(o.items, item)
-}
-
-func (o *objStack) clear() {
-	o.items = nil
-}
-
 type JsonQueryVisitorImpl struct {
 	antlr.ParseTreeVisitor
 
 	item map[string]interface{}
-
-	stack *objStack
 
 	currentOperation Operation
 	leftOp           Operand
@@ -53,12 +25,14 @@ type JsonQueryVisitorImpl struct {
 	debugErr error
 
 	doPanic bool
+
+	// regexCache holds regex literals precompiled at parse time; nil when disabled.
+	regexCache map[*RegexValueContext]*regexp.Regexp
 }
 
 func NewJsonQueryVisitorImpl(item map[string]interface{}) *JsonQueryVisitorImpl {
 	return &JsonQueryVisitorImpl{
-		stack: &objStack{},
-		item:  item,
+		item: item,
 	}
 }
 
@@ -141,6 +115,17 @@ func (j *JsonQueryVisitorImpl) VisitCompareExp(ctx *CompareExpContext) interface
 	}
 	var apply func(Operand, Operand) (bool, error)
 	currentOp := j.currentOperation
+	if currentOp == nil {
+		j.setErr(ErrInvalidOperation)
+		return false
+	}
+	if _, ok := currentOp.(*IntOperation); ok {
+		switch j.leftOp.(type) {
+		case float64, float32:
+			// JSON numbers are float64: don't truncate 1.9 to compare with 1
+			currentOp = &FloatOperation{}
+		}
+	}
 
 	switch ctx.op.GetTokenType() {
 	case JsonQueryParserEQ:
@@ -246,44 +231,22 @@ func GetSubAttr(source interface{}, index string) interface{} {
 	return nil
 }
 
+// VisitAttrPath resolves the left operand and starts a fresh comparison, so
+// nothing leaks in from the previous one.
 func (j *JsonQueryVisitorImpl) VisitAttrPath(ctx *AttrPathContext) interface{} {
-	var item interface{}
-	index := ctx.ATTRNAME().GetText()
-
-	if ctx.SubAttr() == nil || ctx.SubAttr().IsEmpty() {
-		if !j.stack.empty() {
-			item = j.stack.pop()
-		} else {
-			item = j.item
+	var item interface{} = j.item
+	for cur := IAttrPathContext(ctx); ; {
+		item = GetSubAttr(item, cur.ATTRNAME().GetText())
+		sub := cur.SubAttr()
+		if sub == nil || sub.AttrPath() == nil {
+			break
 		}
-		if item == nil {
-			return nil
-		}
-		j.leftOp = GetSubAttr(item, index)
-
-		if j.currentOperation == nil {
-			j.currentOperation = GetCurrentOperationByRight(j.leftOp)
-		}
-		//fmt.Println("j.currentOperation", reflect.TypeOf(j.currentOperation).String())
-
-		//fmt.Println("j.leftOp (after)", j.leftOp)
-		//fmt.Println("j.item[index]", j.item[index])
-		//fmt.Println("item.(type)", reflect.TypeOf(item))
-
-		j.stack.clear()
-		return nil
+		cur = sub.AttrPath()
 	}
-
-	if !j.stack.empty() {
-		item = j.stack.peek()
-	} else {
-		item = j.item
-	}
-	if item == nil {
-		return nil
-	}
-	j.stack.push(GetSubAttr(item, index))
-	return ctx.SubAttr().Accept(j)
+	j.leftOp = item
+	j.rightOp = nil
+	j.currentOperation = GetCurrentOperationByRight(item)
+	return nil
 }
 
 func (j *JsonQueryVisitorImpl) VisitSubAttr(ctx *SubAttrContext) interface{} {
@@ -338,38 +301,25 @@ func GetCurrentOperationByRight(right interface{}) Operation {
 }
 
 func (j *JsonQueryVisitorImpl) VisitValueAttrPath(ctx *ValueAttrPathContext) interface{} {
-	var item interface{}
-	index := ctx.ATTRNAME().GetText()
-	if ctx.ValueSubAttr() == nil || ctx.ValueSubAttr().IsEmpty() {
-		if !j.stack.empty() {
-			item = j.stack.pop()
-		} else {
-			item = j.item
+	var item interface{} = j.item
+	for cur := IValueAttrPathContext(ctx); ; {
+		item = GetSubAttr(item, cur.ATTRNAME().GetText())
+		sub := cur.ValueSubAttr()
+		if sub == nil || sub.ValueAttrPath() == nil {
+			break
 		}
-		if item == nil {
-			return nil
+		cur = sub.ValueAttrPath()
+	}
+	j.rightOp = item
+
+	// the left operand picks the operation; fall back to the right one when
+	// the left is missing or of an unsupported type
+	if j.leftOp == nil || j.currentOperation == nil {
+		if op := GetCurrentOperationByRight(item); op != nil {
+			j.currentOperation = op
 		}
-
-		j.rightOp = GetSubAttr(item, index)
-		j.stack.clear()
-
-		if j.currentOperation == nil {
-			j.currentOperation = GetCurrentOperationByRight(j.rightOp)
-		}
-
-		return nil
 	}
-	if !j.stack.empty() {
-		item = j.stack.peek()
-	} else {
-		item = j.item
-	}
-	if item == nil {
-		return nil
-	}
-
-	j.stack.push(GetSubAttr(item, index))
-	return ctx.ValueSubAttr().Accept(j)
+	return nil
 }
 
 func (j *JsonQueryVisitorImpl) VisitValueSubAttr(ctx *ValueSubAttrContext) interface{} {
@@ -412,9 +362,9 @@ func (j *JsonQueryVisitorImpl) VisitDouble(ctx *DoubleContext) interface{} {
 	j.currentOperation = &FloatOperation{}
 	val, err := strconv.ParseFloat(ctx.GetText(), 10)
 	if err != nil {
-		// TODO set err somewhere
 		j.rightOp = nil
-		return false
+		j.setErr(err)
+		return nil
 	}
 	j.rightOp = val
 	return nil
@@ -514,29 +464,41 @@ func (j *JsonQueryVisitorImpl) VisitSubListOfStrings(ctx *SubListOfStringsContex
 
 /* NEEEEEEEEEEEEEEEEEEEEEW STUFFFFFFFFFFFFFFFFFFFF */
 
-func (j *JsonQueryVisitorImpl) VisitListIPs(ctx *ListIPsContext) interface{} {
-	return ctx.SubListOfIPs().Accept(j)
+// parseIPNet reads an address or CIDR literal; a bare address becomes a
+// single-host network.
+func parseIPNet(txt string) (*net.IPNet, error) {
+	if strings.Contains(txt, "/") {
+		_, ipNet, err := net.ParseCIDR(txt)
+		return ipNet, err
+	}
+	ip := net.ParseIP(txt)
+	if ip == nil {
+		return nil, errors.New("Invalid IP value")
+	}
+	if v4 := ip.To4(); v4 != nil {
+		ip = v4
+	}
+	return &net.IPNet{IP: ip, Mask: net.CIDRMask(len(ip)*8, len(ip)*8)}, nil
 }
 
-func (j *JsonQueryVisitorImpl) VisitSubListOfIPs(ctx *SubListOfIPsContext) interface{} {
-	if j.rightOp == nil {
-		j.rightOp = make([]any, 0)
-	}
-	rawVal := ctx.IpValue()
-	list := j.rightOp.([]any)
-	var val any = nil
-	if rawVal != nil {
-		if rawVal.IP_ADDRESS() != nil {
-			val = net.ParseIP(rawVal.IP_ADDRESS().GetText())
-		} else if rawVal.IP_CIDR() != nil {
-			val = net.ParseIP(rawVal.IP_CIDR().GetText())
+func (j *JsonQueryVisitorImpl) VisitListIPs(ctx *ListIPsContext) interface{} {
+	j.currentOperation = &IPCompareOperation{}
+	nets := []*net.IPNet{}
+	for sub := ctx.SubListOfIPs(); sub != nil && sub.IpValue() != nil; sub = sub.SubListOfIPs() {
+		ipNet, err := parseIPNet(sub.IpValue().GetText())
+		if err != nil {
+			j.setErr(err)
+			return nil
 		}
+		nets = append(nets, ipNet)
 	}
-	j.rightOp = append(list, val)
-	if ctx.SubListOfIPs() == nil || ctx.SubListOfIPs().IsEmpty() {
-		return nil
-	}
-	return ctx.SubListOfIPs().Accept(j)
+	j.rightOp = nets
+	return nil
+}
+
+// VisitSubListOfIPs is only here to satisfy JsonQueryVisitor; VisitListIPs walks the list.
+func (j *JsonQueryVisitorImpl) VisitSubListOfIPs(ctx *SubListOfIPsContext) interface{} {
+	return nil
 }
 
 func (j *JsonQueryVisitorImpl) VisitIpValue(ctx *IpValueContext) interface{} {
@@ -571,54 +533,65 @@ func (j *JsonQueryVisitorImpl) VisitIpValue(ctx *IpValueContext) interface{} {
 
 		j.rightOp = val
 	} else {
-		j.rightOp = net.ParseIP(txt)
-
+		ip := net.ParseIP(txt)
+		if ip == nil {
+			// the lexer accepts more groups than a real address can have
+			j.setErr(errors.New("Invalid IP value"))
+			return nil
+		}
+		j.rightOp = ip
 	}
 
 	return nil
 }
-func (j *JsonQueryVisitorImpl) VisitRegexValue(ctx *RegexValueContext) interface{} {
-	j.currentOperation = &RegexOperation{}
-	rawRegex := ctx.REGEX().GetText()
 
-	// check if regex starts with /
-	if !strings.HasPrefix(rawRegex, "/") {
-		j.setErr(errors.New("Invalid regex"))
-		return nil
-	}
-
-	// get last index of / from the regex
+// compileRegexLiteral compiles a /pattern/flags literal from the rule text.
+func compileRegexLiteral(rawRegex string) (*regexp.Regexp, error) {
 	lastIndex := strings.LastIndex(rawRegex, "/")
-	if lastIndex == -1 {
-		j.setErr(errors.New("Invalid regex"))
+	if !strings.HasPrefix(rawRegex, "/") || lastIndex < 1 {
+		return nil, errors.New("Invalid regex")
+	}
+
+	regex := rawRegex[1:lastIndex]
+	for _, flag := range rawRegex[lastIndex+1:] {
+		switch flag {
+		case 'i':
+			regex = "(?i)" + regex
+		case 'm':
+			regex = "(?m)" + regex
+		}
+	}
+	return regexp.Compile(regex)
+}
+
+// collectRegexes precompiles every regex literal in the tree. Literals that
+// fail to compile are left out, so Process reports the error as before.
+func collectRegexes(tree antlr.Tree, cache map[*RegexValueContext]*regexp.Regexp) {
+	if ctx, ok := tree.(*RegexValueContext); ok && ctx.REGEX() != nil {
+		if re, err := compileRegexLiteral(ctx.REGEX().GetText()); err == nil {
+			cache[ctx] = re
+		}
+		return
+	}
+	for _, child := range tree.GetChildren() {
+		collectRegexes(child, cache)
+	}
+}
+
+func (j *JsonQueryVisitorImpl) VisitRegexValue(ctx *RegexValueContext) interface{} {
+	if ctx.REGEX() == nil {
+		// `a mt b`: the pattern comes from the input object
+		ctx.ValueAttrPath().Accept(j)
+		j.currentOperation = &RegexOperation{}
+		return nil
+	}
+	j.currentOperation = &RegexOperation{}
+	if re, ok := j.regexCache[ctx]; ok {
+		j.rightOp = re
 		return nil
 	}
 
-	// get the regex without the / at the start and end
-	regex := rawRegex[1:lastIndex]
-	flags := rawRegex[lastIndex+1:]
-
-	if flags != "" {
-		// check if the flags are valid
-		if !strings.ContainsAny(flags, "gim") {
-			j.setErr(errors.New("Invalid regex flags"))
-			return nil
-		}
-
-		for _, flag := range flags {
-			switch flag {
-			case 'i':
-				regex = fmt.Sprintf("(?i)%s", regex)
-				break
-			case 'm':
-				regex = fmt.Sprintf("(?m)%s", regex)
-				break
-			}
-		}
-	}
-
-	// build regex
-	compiledRegex, err := regexp.Compile(regex)
+	compiledRegex, err := compileRegexLiteral(ctx.REGEX().GetText())
 	if err != nil {
 		j.setErr(err)
 		return nil
@@ -636,6 +609,10 @@ func (j *JsonQueryVisitorImpl) VisitRegexExp(ctx *RegexExpContext) interface{} {
 	}
 	var apply func(Operand, Operand) (bool, error)
 	currentOp := j.currentOperation
+	if currentOp == nil {
+		j.setErr(ErrInvalidOperation)
+		return false
+	}
 	switch ctx.op.GetTokenType() {
 	case JsonQueryParserMT:
 		apply = currentOp.MT
@@ -695,12 +672,20 @@ func (j *JsonQueryVisitorImpl) VisitRegexExp(ctx *RegexExpContext) interface{} {
 
 func (j *JsonQueryVisitorImpl) VisitIpCompareExp(ctx *IpCompareExpContext) interface{} {
 	ctx.AttrPath().Accept(j)
-	ctx.IpValue().Accept(j)
+	if list := ctx.ListIPs(); list != nil {
+		list.Accept(j)
+	} else {
+		ctx.IpValue().Accept(j)
+	}
 	if j.hasErr() {
 		return false
 	}
 	var apply func(Operand, Operand) (bool, error)
 	currentOp := j.currentOperation
+	if currentOp == nil {
+		j.setErr(ErrInvalidOperation)
+		return false
+	}
 	switch ctx.op.GetTokenType() {
 	case JsonQueryParserEQ:
 		apply = currentOp.EQ

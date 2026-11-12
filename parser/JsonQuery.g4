@@ -5,6 +5,7 @@ query
    | query SP LOGICAL_OPERATOR SP query                                                   #logicalExp
    | attrPath SP 'pr'                                                                     #presentExp
    | attrPath SP op=( EQ | NE | IN ) SP ipValue                                           #ipCompareExp
+   | attrPath SP op=IN SP listIPs                                                         #ipCompareExp
    | attrPath SP op=( EQ | NE | GT | LT | GE | LE | CO | SW | EW | IN ) SP value          #compareExp
    | attrPath SP op=MT SP regexValue                                                      #regexExp
    ;
@@ -147,9 +148,13 @@ fragment OCTET
     ;
 
 fragment IPv6
-    :   (HEX_QUARTET ':') (HEX_QUARTET ':') (HEX_QUARTET ':') (HEX_QUARTET ':') (HEX_QUARTET ':')  HEX_QUARTET (':' HEX_QUARTET)?  // Basic IPv6 (six quartets + one or two more)
-    |   '::' (HEX_QUARTET ':')* HEX_QUARTET                    // Leading ::
-    |   (HEX_QUARTET ':')* ':' (HEX_QUARTET ':')* HEX_QUARTET // Embedded ::
+    :   HEX_QUARTET ':' HEX_QUARTET ':' HEX_QUARTET ':' HEX_QUARTET ':' HEX_QUARTET ':' HEX_QUARTET ':' HEX_QUARTET ':' HEX_QUARTET  // Full form, eight quartets
+    |   IPv6_GROUPS? '::' IPv6_GROUPS?  // Compressed; group count is validated when the rule is evaluated
+    |   IPv6_GROUPS? '::' (IPv6_GROUPS ':')? IPv4  // Embedded IPv4, e.g. ::ffff:1.2.3.4
+    ;
+
+fragment IPv6_GROUPS
+    :   HEX_QUARTET (':' HEX_QUARTET)*
     ;
 
 fragment HEX_QUARTET

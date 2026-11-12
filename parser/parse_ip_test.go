@@ -145,8 +145,56 @@ func TestIPMatchedRule(t *testing.T) {
 			obj{
 				"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
 			},
+			true,
+			false,
+		},
+		{
+			`x in 2001:db8::/32`,
+			obj{
+				"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+			},
+			true,
+			false,
+		},
+		{
+			`x in fe80::/10`,
+			obj{
+				"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+			},
 			false,
 			false,
+		},
+		{
+			`x eq 2001:db8:85a3::8a2e:370:7334`,
+			obj{
+				"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+			},
+			true,
+			false,
+		},
+		{
+			`x eq 2001:db8:85a3:0:0:8a2e:370:7334`,
+			obj{
+				"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+			},
+			true,
+			false,
+		},
+		{
+			`x ne ::1`,
+			obj{
+				"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+			},
+			true,
+			false,
+		},
+		{
+			`x eq 1:2:3:4:5:6:7::8:9`,
+			obj{
+				"x": net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+			},
+			false,
+			true,
 		},
 	}
 

@@ -65,20 +65,7 @@ func (o *FloatOperation) LE(left Operand, right Operand) (bool, error) {
 }
 
 func (o *FloatOperation) IN(left Operand, right Operand) (bool, error) {
-	leftVal, err := toFloat(left)
-	if err != nil {
-		return false, err
-	}
-	rightVal, ok := right.([]float64)
-	if !ok {
-		return false, newErrInvalidOperand(right, rightVal)
-	}
-	for _, num := range rightVal {
-		if num == leftVal {
-			return true, nil
-		}
-	}
-	return false, nil
+	return numIn(left, right)
 }
 
 func (o *FloatOperation) MT(left Operand, right Operand) (bool, error) {
